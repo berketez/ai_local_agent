@@ -1,127 +1,129 @@
- AI Helper
+AI Helper
 
-AI Helper, macOS sisteminizle doğal dil komutları aracılığıyla etkileşime girmenizi sağlayan, yerel olarak çalışan bir LLM (Large Language Model) destekli yapay zeka asistanıdır.
+AI Helper is a locally running LLM (Large Language Model) powered artificial intelligence assistant that allows you to interact with your macOS system through natural language commands.
 
-## Özellikleri
+## Features
 
-- **Yerel LLM Entegrasyonu**: Ollama veya LM Studio aracılığıyla yerel LLM modellerini kullanma
-- **Sistem Etkileşimi**: Dosya işlemleri, web tarayıcı kontrolü, uygulama yönetimi ve ekran kontrolü
-- **İzin Sistemi**: Sistem işlemlerinden önce kullanıcı izni isteme
-- **Terminal Arayüzü**: Kullanıcı dostu terminal tabanlı arayüz
+- **Native LLM Integration**: Using local LLM models via Ollama or LM Studio
+- **System Interaction**: File operations, web browser control, application management and screen control
+- **Permission System**: Request user permission before system operations
+- **Terminal Interface**: User-friendly terminal-based interface
 
-## Gereksinimler
+## Requirements
 
-- Python 3.8 veya daha yeni
-- macOS işletim sistemi
-- Aşağıdaki Python paketleri:
+- Python 3.8 or newer
+- macOS operating system
+- The following Python packages:
   - llama-cpp-python
   - pyautogui
   - pillow
   - pytesseract
   - rich
 
-## Kurulum
+## Installation
 
-Bağımlılıkları yüklemek için:
+To install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Veya kurulum betiğini çalıştırın:
+Or run the installation script:
 
 ```bash
 ./install.sh
 ```
 
-## Kullanım
+## Usage
 
-AI Helper'ı terminal üzerinden başlatmak için:
+To start AI Helper from the terminal:
 
 ```bash
-# Otomatik backend tespiti ile
-python src/main.py --backend auto --model <model_adı>
+# With automatic backend detection
+python src/main.py --backend auto --model <model_name>
 
-# Belirli bir backend seçimi ile
+# With a specific backend selection
 python src/main.py --backend ollama --model llama3.2
 python src/main.py --backend lmstudio_sdk --model llama-3.2-1b-instruct
 ```
 
-### Komut Satırı Seçenekleri
+### Command Line Options
 
-- `--backend`: Kullanılacak LLM backend'i (`auto`, `ollama`, `lmstudio_sdk`, `lmstudio_openai`) - Varsayılan: `auto`
-- `--model`: Kullanılacak model adı (zorunlu)
-- `--context-length`: Model için bağlam uzunluğu (varsayılan: 4096)
-- `--temperature`: Metin üretimi için sıcaklık değeri (varsayılan: 0.7)
-- `--verbose` veya `-v`: Ayrıntılı çıktıyı etkinleştirme
+- `-backend`: LLM backend to use (`auto`, `ollama`, `lmstudio_sdk`, `lmstudio_openai`) - Default: `auto`
+- `--model`: Model name to use (mandatory)
+- `--context-length`: Context length for the model (default: 4096)
+- `-temperature`: Temperature value for text generation (default: 0.7)
+- `--verbose` or `-v`: Enabling detailed output
 
-## Etkileşim Örnekleri
+## Interaction Examples
 
-AI Helper çalıştığında, doğal dil kullanarak etkileşimde bulunabilirsiniz:
+When AI Helper is running, you can interact using natural language:
 
-### Web Tarama
+### Web Browsing
 ```
-> Safari'yi aç ve apple.com'a git
-> Google'da "en son macOS özellikleri" için arama yap
-```
-
-### Dosya İşlemleri
-```
-> Masaüstünde todo.txt adında yeni bir metin dosyası oluştur
-> ~/Documents/notes.txt dosyasının içeriğini oku
-> İndirmeler klasörümdeki tüm dosyaları listele
+> Open Safari and go to apple.com
+> Search Google for ‘latest macOS features’
 ```
 
-### Uygulama Kontrolü
+### File Operations
 ```
-> Hesap Makinesi uygulamasını aç
-> Safari'yi kapat
-> Çalışan tüm uygulamaları listele
-```
-
-### Sistem Etkileşimi
-```
-> Ekranımın ekran görüntüsünü al
-> Mevcut uygulamada "Merhaba dünya!" yaz
-> Faremi ekranın ortasına taşı ve tıkla
+> Create a new text file called todo.txt on the desktop
+> Read the contents of ~/Documents/notes.txt
+> List all files in my Downloads folder
 ```
 
-## Mimari
+### Application Control
+```
+> Open the Calculator app
+> Close Safari
+> List all running applications
+```
 
-AI Helper şu ana bileşenlerden oluşur:
+### System Interaction
+```
+> Take a screenshot of my screen
+> In the current application, write ‘Hello world!’
+> Move my mouse to the centre of the screen and click
+```
 
-1. **LLM Entegrasyonu**: Yerel modelleri yükler ve kullanır
-2. **İzin Sistemi**: Sistem eylemleri öncesinde kullanıcı izni ister
-3. **Sistem Etkileşim Katmanı**: Sistem işlemlerini gerçekleştirir
-4. **Komut Yorumlayıcı**: Doğal dil komutlarını yorumlar
-5. **Terminal Arayüzü**: Kullanıcı etkileşimini yönetir
+## Architecture
 
-## Güvenlik
+AI Helper consists of the following main components:
 
-- Tüm izinler açıkça istenir ve iptal edilebilir
-- Veriler harici sunuculara gönderilmez (tamamen yerel çalışır)
-- Gerçekleştirilen tüm eylemlerin açık kaydı tutulur
-- Mümkün olduğunca korumalı çalıştırma
+1. **LLM Integration**: Loads and uses local models
+2. **Permission System**: Requests user permission before system actions
+3. **System Interaction Layer**: Performs system operations
+4. **Command Interpreter**: Interprets natural language commands
+5. **Terminal Interface**: Manages user interaction
 
-## İzin Yönetimi
+## Security
 
-AI Helper, sisteminizle etkileşimde bulunan işlemlerden önce her zaman izin ister. Şunları yapabilirsiniz:
+- All permits are expressly requested and can be cancelled
+- Data is not sent to external servers (works completely locally)
+- A clear record of all actions performed is kept
+- Protected operation as far as possible
 
-- Tek bir eylem için izin ver
-- Bir eylem kategorisi için izin ver
-- Belirli bir süre sonra sona eren geçici izin ver
+## Permission Management
 
-## Çıkış
+AI Helper always asks for permission before processes that interact with your system. You can do the following
 
-AI Helper'dan çıkmak için şunlardan birini yazın:
+- Allow for a single action
+- Allow for a category of action
+- Grant temporary leave that expires after a certain period of time
+
+## Exit
+
+To exit AI Helper, type one of the following:
 ```
 exit
 ```
-veya
+or
 ```
 quit
 ```
 
-## Lisans
+## Licence
 
-Bu proje lisansı için LICENSE dosyasına bakınız.
+See the LICENSE file for this project licence.
+
+Translated with www.DeepL.com/Translator (free version)
