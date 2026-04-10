@@ -76,17 +76,30 @@ class SecureTerminalExecutor:
                 }
 
         try:
-            # Use shlex to parse the command safely
-            args = shlex.split(command)
-            
-            # Execute the command
-            process = subprocess.run(
-                args,
-                capture_output=True,
-                text=True,
-                check=False, # Don't raise exception on non-zero exit code
-                timeout=60 # Add a timeout for safety
-            )
+            # Detect shell operators that require shell=True
+            shell_operators = ['>', '<', '|', '&&', '||', ';', '$(', '`']
+            needs_shell = any(op in command for op in shell_operators)
+
+            if needs_shell:
+                # Use shell=True for commands with redirects/pipes
+                process = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=60
+                )
+            else:
+                # Use shlex for simple commands (safer)
+                args = shlex.split(command)
+                process = subprocess.run(
+                    args,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=60
+                )
 
             return {
                 "success": process.returncode == 0,

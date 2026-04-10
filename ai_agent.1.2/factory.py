@@ -9,8 +9,8 @@ availability and user preferences.
 from typing import List
 
 from base import BaseLLM
-from ollama import OllamaLLM
-from lmstudio import LMStudioSDK, LMStudioOpenAI
+from ollama_backend import OllamaLLM
+from lmstudio_backend import LMStudioSDK, LMStudioOpenAI
 
 class LLMFactory:
     """Factory for creating LLM backends."""

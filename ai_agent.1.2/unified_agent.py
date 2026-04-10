@@ -16,12 +16,12 @@ from typing import Dict, Any, List, Optional
 # Attempting relative import assuming flat structure for now
 try:
     # Use the OllamaLLM class from the provided ollama.py
-    from ollama import OllamaLLM 
+    from ollama_backend import OllamaLLM 
 except ImportError:
     print("Warning: Could not import OllamaLLM from ollama.py. Ollama backend might not work.")
     OllamaLLM = None
 try:
-    from lmstudio import LMStudioOpenAI  # OpenAI-compatible LM Studio backend
+    from lmstudio_backend import LMStudioOpenAI  # OpenAI-compatible LM Studio backend
 except ImportError:
     print("Warning: Could not import LMStudioOpenAI from lmstudio.py. LMStudio backend might not work.")
     LMStudioOpenAI = None

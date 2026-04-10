@@ -32,7 +32,7 @@ class OllamaLLM(BaseLLM):
         try:
             import ollama
             # Create a client with the specified host
-            self.ollama_client = ollama.Client(host=self.host)
+            self.ollama_client = ollama.Client(host=self.host, timeout=300)
         except ImportError:
             print("Ollama Python library not found. Install it with: pip install ollama")
             self.ollama_client = None
@@ -78,7 +78,15 @@ class OllamaLLM(BaseLLM):
         params.update(kwargs)
         
         try:
-            return self.ollama_client.chat(**params)
+            response = self.ollama_client.chat(**params)
+            # Extract text from response object
+            if hasattr(response, 'message'):
+                msg = response.message
+                if hasattr(msg, 'content'):
+                    return {"message": {"content": msg.content, "role": msg.role}}
+            if isinstance(response, dict):
+                return response
+            return {"message": {"content": str(response)}}
         except Exception as e:
             raise RuntimeError(f"Ollama chat request failed: {str(e)}")
     
@@ -106,7 +114,13 @@ class OllamaLLM(BaseLLM):
         params.update(kwargs)
         
         try:
-            return self.ollama_client.generate(**params)
+            response = self.ollama_client.generate(**params)
+            # Extract text from response object
+            if hasattr(response, 'response'):
+                return response.response
+            if isinstance(response, dict):
+                return response.get('response', str(response))
+            return str(response)
         except Exception as e:
             raise RuntimeError(f"Ollama generate request failed: {str(e)}")
     

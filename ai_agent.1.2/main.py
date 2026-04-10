@@ -53,6 +53,11 @@ def parse_arguments():
         action="store_true",
         help="Enable verbose output",
     )
+    parser.add_argument(
+        "--auto-confirm",
+        action="store_true",
+        help="Auto-confirm all permission prompts (for testing only)",
+    )
     return parser.parse_args()
 
 
@@ -160,9 +165,14 @@ def main():
 
     try:
         from secure_terminal import SecureTerminalExecutor
-        agent.terminal_executor = SecureTerminalExecutor(
-            confirmation_callback=agent._request_confirmation
-        )
+        if args.auto_confirm:
+            agent.terminal_executor = SecureTerminalExecutor(
+                confirmation_callback=lambda cmd: True
+            )
+        else:
+            agent.terminal_executor = SecureTerminalExecutor(
+                confirmation_callback=agent._request_confirmation
+            )
     except Exception:
         agent.terminal_executor = None
 
