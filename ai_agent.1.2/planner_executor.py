@@ -240,6 +240,48 @@ Diğer talimatlar:
 Başla.
 """
     
+    def _extract_page_info(self) -> Dict[str, Any]:
+        """Extract basic page information from the browser.
+
+        This replaces the non-existent extract_javascript() method.
+        Returns a dict with title, url, navigations, and forms keys.
+        """
+        info: Dict[str, Any] = {
+            "title": "",
+            "url": getattr(self.browser, "current_url", ""),
+            "navigations": [],
+            "forms": [],
+        }
+        try:
+            driver = getattr(self.browser, "driver", None)
+            if driver is None:
+                return info
+            info["title"] = driver.title or ""
+            info["url"] = driver.current_url or ""
+            # Gather links
+            from selenium.webdriver.common.by import By
+            links = driver.find_elements(By.TAG_NAME, "a")
+            for link in links[:30]:
+                try:
+                    href = link.get_attribute("href") or ""
+                    text = link.text.strip()
+                    if text or href:
+                        info["navigations"].append({"text": text, "href": href})
+                except Exception:
+                    pass
+            # Gather forms
+            forms = driver.find_elements(By.TAG_NAME, "form")
+            for form in forms[:5]:
+                try:
+                    form_id = form.get_attribute("id") or ""
+                    form_action = form.get_attribute("action") or ""
+                    info["forms"].append({"id": form_id, "action": form_action})
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return info
+
     def run_tool(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         """Planner'dan gelen aracı BrowserController'a ilet ve sonuçları al."""
         result = {}
@@ -251,7 +293,7 @@ Başla.
                 })
                 
                 # Sayfanın HTML özeti ve başlığını da ekle
-                html_summary = self.browser.extract_javascript()
+                html_summary = self._extract_page_info()
                 observation = {
                     "success": browser_result.get("success", False),
                     "current_url": self.browser.current_url,
@@ -271,7 +313,7 @@ Başla.
                 self.browser._examine_search_results(args.get("query", ""), 5)
                 
                 # Sayfanın HTML özeti ve başlığını ekle
-                html_summary = self.browser.extract_javascript()
+                html_summary = self._extract_page_info()
                 observation = {
                     "success": browser_result.get("success", False),
                     "current_url": self.browser.current_url,
@@ -304,7 +346,7 @@ Başla.
                 
                 # Yeni URL'yi ve sayfa içeriğini kontrol et
                 self.browser._refresh_current_url()
-                html_summary = self.browser.extract_javascript()
+                html_summary = self._extract_page_info()
                 
                 observation = {
                     "success": browser_result.get("success", False),
@@ -315,7 +357,7 @@ Başla.
                 
             elif name == "EXTRACT_JS":
                 # Sayfanın JavaScript analizini ve HTML özetini al
-                js_analysis = self.browser.extract_javascript()
+                js_analysis = self._extract_page_info()
                 
                 observation = {
                     "success": True,
@@ -341,7 +383,7 @@ Başla.
                 
                 # Yeni URL'yi ve sayfa içeriğini kontrol et
                 self.browser._refresh_current_url()
-                html_summary = self.browser.extract_javascript()
+                html_summary = self._extract_page_info()
                 
                 observation = {
                     "success": True,

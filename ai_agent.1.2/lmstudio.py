@@ -6,8 +6,6 @@ LM Studio local LLM platform, supporting both the Python SDK and OpenAI API.
 """
 
 
-import sys
-import subprocess
 from typing import Dict, List, Any, Union, Iterator
 
 from base import BaseLLM
@@ -33,14 +31,8 @@ class LMStudioSDK(BaseLLM):
             import lmstudio
             self.lmstudio_client = lmstudio
         except ImportError:
-            print("LM Studio Python SDK not found. Installing...")
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "lmstudio"])
-                import lmstudio
-                self.lmstudio_client = lmstudio
-            except Exception as e:
-                print(f"Failed to install LM Studio Python SDK: {str(e)}")
-                self.lmstudio_client = None
+            print("LM Studio Python SDK not found. Install it with: pip install lmstudio")
+            self.lmstudio_client = None
     
     def is_available(self) -> bool:
         """
@@ -230,17 +222,8 @@ class LMStudioOpenAI(BaseLLM):
                 api_key="lm-studio"  # LM Studio doesn't require a real API key
             )
         except ImportError:
-            print("OpenAI Python library not found. Installing...")
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "openai"])
-                from openai import OpenAI
-                self.openai_client = OpenAI(
-                    base_url=self.base_url,
-                    api_key="lm-studio"
-                )
-            except Exception as e:
-                print(f"Failed to install OpenAI Python library: {str(e)}")
-                self.openai_client = None
+            print("OpenAI Python library not found. Install it with: pip install openai")
+            self.openai_client = None
     
     def is_available(self) -> bool:
         """

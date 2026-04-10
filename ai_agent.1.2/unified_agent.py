@@ -21,10 +21,10 @@ except ImportError:
     print("Warning: Could not import OllamaLLM from ollama.py. Ollama backend might not work.")
     OllamaLLM = None
 try:
-    from lmstudio import LMStudioClient # Using existing LM Studio client for now
+    from lmstudio import LMStudioOpenAI  # OpenAI-compatible LM Studio backend
 except ImportError:
-    print("Warning: Could not import LMStudioClient from lmstudio.py. LMStudio backend might not work.")
-    LMStudioClient = None
+    print("Warning: Could not import LMStudioOpenAI from lmstudio.py. LMStudio backend might not work.")
+    LMStudioOpenAI = None
 
 # Import LocalModelClient from planner_executor.py
 try:
@@ -119,13 +119,10 @@ Your Response (Think step-by-step and respond with the next action in JSON forma
                     raise ImportError("OllamaLLM class not available.")
                 # Use the OllamaLLM class from the provided ollama.py
                 return OllamaLLM(model_name=model_name) # Assuming host defaults correctly or add it
-            elif backend == "lmstudio" or backend == "lmstudio_sdk" or backend == "lmstudio_openai":
-                 if not LMStudioClient:
-                     raise ImportError("LMStudioClient class not available.")
-                 # Assuming LMStudioClient takes model_name and potentially api_base/port
-                 # Need to check the actual LMStudioClient implementation from lmstudio.py
-                 # Let's assume it provides a compatible generate/chat method
-                 return LMStudioClient(model=model_name) # Adapt based on actual LMStudioClient implementation
+            elif backend in ("lmstudio", "lmstudio_sdk", "lmstudio_openai"):
+                 if not LMStudioOpenAI:
+                     raise ImportError("LMStudioOpenAI class not available.")
+                 return LMStudioOpenAI(model_name=model_name)
             else:
                  # Fallback or error for unsupported backend
                  self.ui_print(f"Error: Unsupported or unavailable LLM backend 	'{backend}\' specified.")
@@ -331,17 +328,19 @@ Your Response (Think step-by-step and respond with the next action in JSON forma
                 # Assuming LocalModelClient has a 'generate' or similar method
                 # The planner_executor.LocalModelClient uses chat_completion which takes messages list
                 # Let's adapt to use chat_completion if possible, otherwise generate
-                if hasattr(self.llm_client, 'chat_completion'):
-                     # Need to structure history correctly for chat_completion
+                if hasattr(self.llm_client, 'generate'):
+                     # BaseLLM.generate() returns a dict; extract text from it
+                     response_obj = self.llm_client.generate(current_prompt)
+                     if isinstance(response_obj, dict):
+                         llm_response_content = self.llm_client.extract_text_from_response(response_obj)
+                     else:
+                         llm_response_content = str(response_obj)
+                elif hasattr(self.llm_client, 'chat_completion'):
+                     # Legacy LocalModelClient compatibility
                      llm_response_obj = self.llm_client.chat_completion(self.history)
-                     # Assuming response object has structure like OpenAI's
                      llm_response_content = llm_response_obj.choices[0].message.content
-                     # Handle tool calls if the client supports it directly (like planner_executor tried)
-                     # tool_calls = llm_response_obj.choices[0].message.tool_calls
-                elif hasattr(self.llm_client, 'generate'):
-                     llm_response_content = self.llm_client.generate(current_prompt) # Adapt this call
                 else:
-                     raise NotImplementedError("LLM client does not have a compatible generate/chat_completion method.")
+                     raise NotImplementedError("LLM client does not have a compatible generate or chat_completion method.")
                      
             except Exception as e:
                  self.ui_print(f"Error getting LLM response: {e}")

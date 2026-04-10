@@ -38,9 +38,23 @@ class SecureTerminalExecutor:
             Dictionary containing execution results (success, stdout, stderr, return_code).
         """
         
-        # Basic security check: prevent obviously dangerous patterns
-        # This is NOT exhaustive and should be improved
-        dangerous_patterns = ["rm -rf /", "mkfs", ":(){:|:&};:"] # Example patterns
+        # Security check: block dangerous command patterns
+        dangerous_patterns = [
+            "rm -rf /",
+            "mkfs",
+            "dd if=",
+            ":(){ :|:& };:",   # fork bomb (spaced)
+            ":(){:|:&};:",     # fork bomb (compact)
+            "chmod -R 777 /",
+            "curl | sh",
+            "curl|sh",
+            "wget | sh",
+            "wget|sh",
+            "curl | bash",
+            "curl|bash",
+            "wget | bash",
+            "wget|bash",
+        ]
         if any(pattern in command for pattern in dangerous_patterns):
             return {
                 "success": False,

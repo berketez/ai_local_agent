@@ -6,9 +6,6 @@ Ollama local LLM platform.
 """
 
 
-import sys
-
-import subprocess
 from typing import Dict, List, Any, Optional, Union, Iterator
 
 from base import BaseLLM
@@ -37,14 +34,8 @@ class OllamaLLM(BaseLLM):
             # Create a client with the specified host
             self.ollama_client = ollama.Client(host=self.host)
         except ImportError:
-            print("Ollama Python library not found. Installing...")
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "ollama"])
-                import ollama
-                self.ollama_client = ollama.Client(host=self.host)
-            except Exception as e:
-                print(f"Failed to install Ollama Python library: {str(e)}")
-                self.ollama_client = None
+            print("Ollama Python library not found. Install it with: pip install ollama")
+            self.ollama_client = None
     
     def is_available(self) -> bool:
         """

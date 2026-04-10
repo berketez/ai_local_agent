@@ -98,7 +98,7 @@ if [ "$BACKEND" = "lmstudio_sdk" ] || [ "$BACKEND" = "lmstudio_openai" ] || [ "$
 fi
 
 # LM Studio model dizini
-LMSTUDIO_MODELS_DIR="/Users/apple/.lmstudio/models"
+LMSTUDIO_MODELS_DIR="$HOME/.lmstudio/models"
 
 # Model kontrolü
 if [[ "$BACKEND" == *"lmstudio"* ]]; then

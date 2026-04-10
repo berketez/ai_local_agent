@@ -6,9 +6,13 @@ on macOS using various libraries and techniques.
 """
 
 import os
-import subprocess
+import shutil
 from typing import Optional, List, Dict, Any, Tuple
-import sys
+
+# Check for tesseract binary at import time
+TESSERACT_AVAILABLE = shutil.which("tesseract") is not None
+if not TESSERACT_AVAILABLE:
+    print("Warning: tesseract not found. OCR features disabled. Install with: brew install tesseract")
 
 class ScreenController:
     """Controls screen capture and analysis on macOS."""
@@ -43,56 +47,18 @@ class ScreenController:
         except ImportError:
             return False
     
-    def _ensure_dependencies(self) -> Dict[str, bool]:
+    def _check_dependencies(self) -> Dict[str, bool]:
         """
-        Ensure dependencies are available, attempt to install if not.
-        
+        Check dependency availability (no automatic installation).
+
         Returns:
             Dictionary of dependency availability status
         """
-        dependencies = {
+        return {
             "pyautogui": self.pyautogui_available,
             "pillow": self.pillow_available,
             "pytesseract": self.pytesseract_available
         }
-        
-        if not self.pyautogui_available:
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "pyautogui"],
-                    check=True
-                )
-                import pyautogui
-                dependencies["pyautogui"] = True
-                self.pyautogui_available = True
-            except:
-                pass
-        
-        if not self.pillow_available:
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "Pillow"],
-                    check=True
-                )
-                from PIL import Image
-                dependencies["pillow"] = True
-                self.pillow_available = True
-            except:
-                pass
-        
-        if not self.pytesseract_available:
-            try:
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "pytesseract"],
-                    check=True
-                )
-                import pytesseract
-                dependencies["pytesseract"] = True
-                self.pytesseract_available = True
-            except:
-                pass
-        
-        return dependencies
     
     def capture_screen(self, region: Optional[Tuple[int, int, int, int]] = None) -> Dict[str, Any]:
         """
@@ -104,8 +70,8 @@ class ScreenController:
         Returns:
             Result dictionary with image data if successful
         """
-        dependencies = self._ensure_dependencies()
-        
+        dependencies = self._check_dependencies()
+
         if not dependencies["pyautogui"] or not dependencies["pillow"]:
             return {
                 "success": False,
@@ -148,35 +114,42 @@ class ScreenController:
         Returns:
             Result dictionary with extracted text if successful
         """
-        dependencies = self._ensure_dependencies()
-        
+        if not TESSERACT_AVAILABLE:
+            return {
+                "success": False,
+                "text": None,
+                "message": "OCR disabled: tesseract binary not found. Install with: brew install tesseract"
+            }
+
+        dependencies = self._check_dependencies()
+
         if not dependencies["pyautogui"] or not dependencies["pillow"] or not dependencies["pytesseract"]:
             return {
                 "success": False,
                 "text": None,
                 "message": "Required dependencies not available. Please install PyAutoGUI, Pillow, and pytesseract."
             }
-        
+
         try:
             # First capture the screen
             capture_result = self.capture_screen(region)
-            
+
             if not capture_result["success"]:
                 return {
                     "success": False,
                     "text": None,
                     "message": f"Failed to capture screen: {capture_result['message']}"
                 }
-            
+
             # Now extract text using pytesseract
             import pytesseract
             from PIL import Image
-            
+
             image_path = capture_result["image_path"]
             image = Image.open(image_path)
-            
+
             text = pytesseract.image_to_string(image)
-            
+
             return {
                 "success": True,
                 "text": text,
