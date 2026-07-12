@@ -1,175 +1,140 @@
 # secure_terminal.py
 
 """
-Secure Terminal Module - Handles secure terminal command execution
+Secure Terminal Module - shell komutlarını exec-approvals politikasıyla çalıştırır.
 
-This module provides functionality to execute terminal commands securely,
-requesting user confirmation before execution and handling outputs.
+openclaw'un exec-approvals modeli (security/exec_approvals.py) ile entegre:
+- deny / allowlist / full güvenlik modları
+- safe-bins + kalıcı allowlist (allow-always)
+- tehlikeli ortam değişkeni (DYLD_*/LD_*/NODE_OPTIONS/PYTHONPATH) temizliği
+
+exec_approvals verilmezse eski string-blocklist davranışına düşer (geriye dönük uyumluluk).
 """
 
+import os
 import subprocess
 import shlex
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-# Assuming TerminalUI is in a separate file or integrated elsewhere
-# For now, we'll use basic print/input for confirmation
+TIMEOUT_SEC = 60
+SHELL_OPERATORS = [">", "<", "|", "&&", "||", ";", "$(", "`", "&"]
+
+# exec_approvals yoksa kullanılan eski (zayıf) blocklist — sadece fallback.
+_LEGACY_DANGEROUS = [
+    "rm -rf /", "mkfs", "dd if=", ":(){ :|:& };:", ":(){:|:&};:",
+    "chmod -R 777 /", "curl | sh", "curl|sh", "wget | sh", "wget|sh",
+    "curl | bash", "curl|bash", "wget | bash", "wget|bash",
+]
+
 
 def request_confirmation_basic(command: str) -> bool:
-    """Basic confirmation prompt using input()."""
     response = input(f"PERMISSION REQUEST: Execute command \"{command}\"? (y/n): ")
     return response.lower() in ("y", "yes")
 
+
 class SecureTerminalExecutor:
-    """Executes terminal commands securely with user confirmation."""
+    """Shell komutlarını exec-approvals politikasıyla güvenli çalıştırır."""
 
-    def __init__(self, confirmation_callback=request_confirmation_basic):
-        """Initialize the secure terminal executor."""
+    def __init__(self, confirmation_callback=request_confirmation_basic,
+                 exec_approvals=None, auto_confirm: bool = False):
         self.confirmation_callback = confirmation_callback
+        self.exec_approvals = exec_approvals
+        self.auto_confirm = auto_confirm
 
+    # ------------------------------------------------------------------ #
+    def _approve(self, command: str) -> Dict[str, Any]:
+        """
+        Komutu politikaya göre değerlendir.
+        Dönüş: {"run": bool, "error": str|None}
+        """
+        if self.auto_confirm:
+            return {"run": True, "error": None}
+
+        # --- exec-approvals modeli (tercih edilen) ---
+        if self.exec_approvals is not None:
+            ev = self.exec_approvals.evaluate(command)
+            # Politika izin verdi ve ek onay gerekmiyorsa: doğrudan çalıştır.
+            if ev.get("allowed") and not ev.get("requires_approval"):
+                return {"run": True, "error": None}
+            # Onay gerekiyorsa kullanıcıya sor.
+            if ev.get("requires_approval") or not ev.get("allowed"):
+                approved = self.confirmation_callback(command)
+                if not approved:
+                    return {"run": False, "error": "User denied permission."}
+                # "allow-always": onaylanan komutun binary'sini kalıcı allowlist'e ekle.
+                binary = ev.get("binary")
+                if binary:
+                    try:
+                        self.exec_approvals.add_allowlist_entry(binary)
+                    except Exception:
+                        pass
+                return {"run": True, "error": None}
+            return {"run": True, "error": None}
+
+        # --- Fallback: eski blocklist + basit onay ---
+        if any(p in command for p in _LEGACY_DANGEROUS):
+            return {"run": False, "error": "Command blocked due to potential security risk."}
+        if not self.confirmation_callback(command):
+            return {"run": False, "error": "User denied permission."}
+        return {"run": True, "error": None}
+
+    def _safe_env(self) -> Optional[Dict[str, str]]:
+        """Tehlikeli env değişkenlerini temizlenmiş bir kopya döndürür."""
+        if self.exec_approvals is None:
+            return None  # subprocess mevcut env'i kullanır
+        try:
+            return self.exec_approvals.sanitize_env(dict(os.environ))
+        except Exception:
+            return None
+
+    # ------------------------------------------------------------------ #
     def execute_command(self, command: str, require_confirmation: bool = True) -> Dict[str, Any]:
-        """
-        Execute a terminal command after optional user confirmation.
-
-        Args:
-            command: The command string to execute.
-            require_confirmation: Whether to ask for user confirmation before execution.
-
-        Returns:
-            Dictionary containing execution results (success, stdout, stderr, return_code).
-        """
-        
-        # Security check: block dangerous command patterns
-        dangerous_patterns = [
-            "rm -rf /",
-            "mkfs",
-            "dd if=",
-            ":(){ :|:& };:",   # fork bomb (spaced)
-            ":(){:|:&};:",     # fork bomb (compact)
-            "chmod -R 777 /",
-            "curl | sh",
-            "curl|sh",
-            "wget | sh",
-            "wget|sh",
-            "curl | bash",
-            "curl|bash",
-            "wget | bash",
-            "wget|bash",
-        ]
-        if any(pattern in command for pattern in dangerous_patterns):
-            return {
-                "success": False,
-                "error": "Command blocked due to potential security risk.",
-                "stdout": "",
-                "stderr": "Command blocked.",
-                "return_code": -1
-            }
-
-        # Request confirmation if required
         if require_confirmation:
-            if not self.confirmation_callback(command):
+            decision = self._approve(command)
+            if not decision["run"]:
                 return {
                     "success": False,
-                    "error": "User denied permission.",
+                    "error": decision["error"],
                     "stdout": "",
-                    "stderr": "Execution cancelled by user.",
-                    "return_code": -1
+                    "stderr": decision["error"],
+                    "return_code": -1,
                 }
 
-        try:
-            # Detect shell operators that require shell=True
-            shell_operators = ['>', '<', '|', '&&', '||', ';', '$(', '`']
-            needs_shell = any(op in command for op in shell_operators)
+        env = self._safe_env()
 
+        try:
+            needs_shell = any(op in command for op in SHELL_OPERATORS)
             if needs_shell:
-                # Use shell=True for commands with redirects/pipes
                 process = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    timeout=60
+                    command, shell=True, capture_output=True, text=True,
+                    check=False, timeout=TIMEOUT_SEC, env=env,
                 )
             else:
-                # Use shlex for simple commands (safer)
                 args = shlex.split(command)
                 process = subprocess.run(
-                    args,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    timeout=60
+                    args, capture_output=True, text=True,
+                    check=False, timeout=TIMEOUT_SEC, env=env,
                 )
-
             return {
                 "success": process.returncode == 0,
                 "stdout": process.stdout.strip(),
                 "stderr": process.stderr.strip(),
-                "return_code": process.returncode
+                "return_code": process.returncode,
             }
-
         except FileNotFoundError:
-             return {
-                "success": False,
-                "error": f"Command not found: {args[0]}",
-                "stdout": "",
-                "stderr": f"Command not found: {args[0]}",
-                "return_code": -1
-            }
+            first = shlex.split(command)[0] if command.strip() else command
+            return {"success": False, "error": f"Command not found: {first}",
+                    "stdout": "", "stderr": f"Command not found: {first}", "return_code": -1}
         except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": "Command timed out after 60 seconds.",
-                "stdout": "",
-                "stderr": "Timeout expired.",
-                "return_code": -1
-            }
+            return {"success": False, "error": f"Command timed out after {TIMEOUT_SEC} seconds.",
+                    "stdout": "", "stderr": "Timeout expired.", "return_code": -1}
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error executing command: {e}",
-                "stdout": "",
-                "stderr": str(e),
-                "return_code": -1
-            }
+            return {"success": False, "error": f"Error executing command: {e}",
+                    "stdout": "", "stderr": str(e), "return_code": -1}
 
-# Example Usage (for testing)
-if __name__ == '__main__':
-    print("Testing SecureTerminalExecutor...")
-    executor = SecureTerminalExecutor()
 
-    # Test 1: Simple command (requires confirmation)
-    print("\nTesting 'ls -l *.py'...")
-    result1 = executor.execute_command("ls -l *.py")
-    print(result1)
-    if result1["success"]:
-        print("Command executed successfully.")
-        print("Output:\n", result1["stdout"])
-    else:
-        print(f"Command failed: {result1['error']}")
-
-    # Test 2: Command that might fail (requires confirmation)
-    print("\nTesting 'cat non_existent_file.txt'...")
-    result2 = executor.execute_command("cat non_existent_file.txt")
-    print(result2)
-    if not result2["success"]:
-        print(f"Command failed as expected: {result2['error']}")
-        print("Stderr:\n", result2["stderr"])
-
-    # Test 3: Command without confirmation
-    print("\nTesting 'echo Hello World' without confirmation...")
-    result3 = executor.execute_command("echo Hello World", require_confirmation=False)
-    print(result3)
-    if result3["success"]:
-        print("Command executed successfully.")
-        print("Output:\n", result3["stdout"])
-
-    # Test 4: Potentially dangerous command (should be blocked)
-    # print("\nTesting 'rm -rf /' (should be blocked)...")
-    # result4 = executor.execute_command("rm -rf /")
-    # print(result4)
-    # if not result4["success"] and "blocked" in result4["error"]:
-    #     print("Command blocked as expected.")
-    # else:
-    #     print("Error: Dangerous command was not blocked!")
-
+if __name__ == "__main__":
+    print("Testing SecureTerminalExecutor (auto_confirm)...")
+    ex = SecureTerminalExecutor(auto_confirm=True)
+    r = ex.execute_command("echo Hello World", require_confirmation=False)
+    print(r)

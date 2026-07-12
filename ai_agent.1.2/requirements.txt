@@ -8,7 +8,12 @@ pytesseract>=0.3.10
 # LLM Backends
 ollama>=0.1.0
 
-# Browser Automation (optional)
+# Browser Automation — Playwright + CDP (tercih edilen, openclaw'dan port)
+# Kurulum: pip install playwright && playwright install chromium
+# (veya mevcut Chrome'a CDP ile bağlan — indirme gerekmez)
+playwright>=1.48.0
+
+# Browser Automation — Selenium (Playwright yoksa fallback)
 selenium>=4.0.0
 webdriver-manager>=4.0.0
 

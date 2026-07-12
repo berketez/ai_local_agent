@@ -123,6 +123,12 @@ def repl(agent, verbose=False):
                 import traceback
                 traceback.print_exc()
 
+    # REPL bitti — browser bağlantılarını temizle.
+    try:
+        agent.close()
+    except Exception:
+        pass
+
 
 def main():
     args = parse_arguments()
@@ -139,85 +145,21 @@ def main():
     print("LLM backend ready.\n")
 
     # --- Build the agent ---
-    # UnifiedAgent expects (llm_backend, model_name, verbose).
-    # We already created the llm instance via the factory, so we
-    # monkey-patch it into the agent to avoid double-initialisation.
-    agent = UnifiedAgent.__new__(UnifiedAgent)
-    agent.verbose = args.verbose
-    agent.history = []
-    agent.max_retries = 3
-    agent.ui_print = print
-    agent.llm_client = llm
-
-    # Initialise tool controllers (same as UnifiedAgent.__init__)
-    try:
-        from browser_selenium import SeleniumBrowserController
-        agent.browser_controller = SeleniumBrowserController()
-    except Exception:
-        agent.browser_controller = None
-        print("Warning: Browser controller not available.")
-
-    try:
-        from deep_researcher import DeepResearcher
-        agent.deep_researcher = DeepResearcher(browser_controller=agent.browser_controller)
-    except Exception:
-        agent.deep_researcher = None
-
-    try:
-        from secure_terminal import SecureTerminalExecutor
-        if args.auto_confirm:
-            agent.terminal_executor = SecureTerminalExecutor(
-                confirmation_callback=lambda cmd: True
-            )
-        else:
-            agent.terminal_executor = SecureTerminalExecutor(
-                confirmation_callback=agent._request_confirmation
-            )
-    except Exception:
-        agent.terminal_executor = None
-
-    try:
-        from command_analyzer import CommandAnalyzer
-        agent.command_analyzer = CommandAnalyzer()
-    except Exception:
-        agent.command_analyzer = None
-
-    agent.tools = agent._define_tools()
-    # Re-use the system prompt template from the class
-    agent.system_prompt_template = UnifiedAgent.__dict__.get(
-        "system_prompt_template",
-        UnifiedAgent("ollama", "dummy", verbose=False).system_prompt_template
-        if False else ""
+    # LLM factory tarafından zaten oluşturuldu; temiz constructor'a geçir.
+    # (Eski __new__ + duplicate system prompt hilesi kaldırıldı.)
+    agent = UnifiedAgent(
+        llm_client=llm,
+        verbose=args.verbose,
+        auto_confirm=args.auto_confirm,
     )
-    # Copy template from class body (set during __init__ in original code)
-    # We read it from a temporary instance-less approach:
-    agent.system_prompt_template = """
-You are a highly capable AI assistant. Your goal is to help the user achieve their objectives by utilizing the tools available to you.
-You can browse the web, perform deep research, execute terminal commands, manage files, and interact with the system.
-
-Available Tools:
-{tool_descriptions}
-
-Instructions:
-1.  Think step-by-step: Break down the user's request into smaller, manageable steps.
-2.  Tool Selection: Choose the most appropriate tool for the current step.
-3.  Action Format: Respond with a JSON object containing the action and its parameters, enclosed in ```json ... ```.
-    Example: ```json {{"action": "deep_research", "params": {{"topic": "Python benefits"}}}} ```
-4.  Observation: After you specify an action, the system will execute it and provide an observation.
-5.  Error Handling: If an action fails, analyze the error and try an alternative approach.
-6.  Final Answer: Once the task is complete, provide a comprehensive final answer starting with "FINAL ANSWER:".
-
-Conversation History:
-{history}
-
-User Request: {user_request}
-
-Your Response:
-"""
 
     # --- Ctrl+C handler ---
     def sigint_handler(sig, frame):
         print("\nInterrupted. Bye!")
+        try:
+            agent.close()
+        except Exception:
+            pass
         sys.exit(0)
 
     signal.signal(signal.SIGINT, sigint_handler)
